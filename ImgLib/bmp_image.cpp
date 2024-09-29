@@ -36,8 +36,9 @@ PACKED_STRUCT_END
 const int BYTES_PER_PIXEL = 3;
 const int ALIGNMENT = 4;
 
-static int GetBMPStride(int w) { return ALIGNMENT * ((w * BYTES_PER_PIXEL + ALIGNMENT - 1) / ALIGNMENT); }
-
+static int GetBMPStride(int w) {
+  return ALIGNMENT * ((w * BYTES_PER_PIXEL + ALIGNMENT - 1) / ALIGNMENT);
+}
 
 // напишите эту функцию
 bool SaveBMP(const Path &file, const Image &image) {
@@ -59,10 +60,15 @@ bool SaveBMP(const Path &file, const Image &image) {
   info_header.height = image.GetHeight();
   info_header.size_image = (image.GetWidth() * 3 + padding) * image.GetHeight();
 
-  output.write(reinterpret_cast<const char *>(&file_header),
-               sizeof(file_header));
-  output.write(reinterpret_cast<const char *>(&info_header),
-               sizeof(info_header));
+  if (!output.write(reinterpret_cast<const char *>(&file_header),
+                    sizeof(file_header))) {
+    return false;
+  }
+
+  if (!output.write(reinterpret_cast<const char *>(&info_header),
+                    sizeof(info_header))) {
+    return false;
+  }
 
   std::vector<uint8_t> buffer(image.GetWidth() * 3);
 
@@ -113,12 +119,13 @@ Image LoadBMP(const Path &file) {
 
   Image image(info_header.width, info_header.height, Color::Black());
 
-  int padding = (4 - (info_header.width * 3) % 4) % 4;
+  int padding = (ALIGNMENT - (info_header.width * 3) % ALIGNMENT) % ALIGNMENT;
 
   std::vector<uint8_t> buffer((info_header.width * 3) + padding);
   for (int y = info_header.height - 1; y >= 0; --y) {
-    input.read(reinterpret_cast<char *>(buffer.data()), buffer.size());
-
+    if (!input.read(reinterpret_cast<char *>(buffer.data()), buffer.size())) {
+      return {};
+    }
     Color *line = image.GetLine(y);
     for (int x = 0; x < info_header.width; ++x) {
       uint8_t blue = buffer[x * 3];
