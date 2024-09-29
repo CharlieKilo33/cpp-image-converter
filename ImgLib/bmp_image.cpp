@@ -29,12 +29,15 @@ PACKED_STRUCT_BEGIN BitmapInfoHeader {
   int32_t x_pixels_per_meter{11811};
   int32_t y_pixels_per_meter{11811};
   uint32_t colors_used{0};
-  uint32_t colors_important{
-      0x1000000};
+  uint32_t colors_important{0x1000000};
 }
 PACKED_STRUCT_END
 
-static int GetBMPStride(int w) { return 4 * ((w * 3 + 3) / 4); }
+const int BYTES_PER_PIXEL = 3;
+const int ALIGNMENT = 4;
+
+static int GetBMPStride(int w) { return ALIGNMENT * ((w * BYTES_PER_PIXEL + ALIGNMENT - 1) / ALIGNMENT); }
+
 
 // напишите эту функцию
 bool SaveBMP(const Path &file, const Image &image) {
@@ -74,11 +77,12 @@ bool SaveBMP(const Path &file, const Image &image) {
 
     if (padding > 0) {
       std::vector<uint8_t> padding_buf(padding, 0);
-      output.write(reinterpret_cast<const char *>(padding_buf.data()),
-                   padding_buf.size());
+      if (!output.write(reinterpret_cast<const char *>(padding_buf.data()),
+                        padding_buf.size())) {
+        return false;
+      }
     }
   }
-
   return true;
 }
 
@@ -93,7 +97,14 @@ Image LoadBMP(const Path &file) {
   BitmapInfoHeader info_header;
 
   input.read(reinterpret_cast<char *>(&file_header), sizeof(file_header));
+  if (!input) {
+    return {};
+  }
+
   input.read(reinterpret_cast<char *>(&info_header), sizeof(info_header));
+  if (!input) {
+    return {};
+  }
 
   if (file_header.file_type != 0x4D42 || info_header.bit_count != 24 ||
       info_header.compression != 0) {
